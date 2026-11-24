@@ -284,7 +284,7 @@
   }
   @media (prefers-reduced-motion:reduce){.xpanel,.qstage.open .xpanel,.exam,.hubcard{transition:none!important}}
   /* Focus visibile da tastiera */
-  nav button:focus-visible,.btn:focus-visible,.opt:focus-visible,.exam:focus-visible,.back:focus-visible,.qnav button:focus-visible,select:focus-visible,.chap .name:focus-visible,.ico:focus-visible,.addch:focus-visible,#thTitle:focus-visible,.imp:focus-visible,.link:focus-visible,.themebtn:focus-visible,.hubcard:focus-visible,.lesitem:focus-visible,.chip:focus-visible,.srcinput:focus-visible,.pvlist:focus-visible,.qbtn:focus-visible,.iconbtn:focus-visible{outline:3px solid var(--pri);outline-offset:2px}
+  nav button:focus-visible,.btn:focus-visible,.opt:focus-visible,.exam:focus-visible,.back:focus-visible,.qnav button:focus-visible,select:focus-visible,.chap .name:focus-visible,.ico:focus-visible,.addch:focus-visible,#thTitle:focus-visible,.imp:focus-visible,.link:focus-visible,.themebtn:focus-visible,.hubcard:focus-visible,.lesitem:focus-visible,.chip:focus-visible,.srcinput:focus-visible,.pvlist:focus-visible,.qbtn:focus-visible,.iconbtn:focus-visible,.bkfil input:focus-visible{outline:3px solid var(--pri);outline-offset:2px}
   /* Avviso temporaneo */
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--toast-bg);color:var(--toast-ink);padding:12px 20px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:10}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -342,6 +342,24 @@
   .btn.flko{background:var(--ko);color:var(--on-solid)}
   .btn.flok{background:var(--ok-ink);color:var(--on-solid)}
   .fldone{max-width:720px;margin:0 auto}
+  /* Banca domande */
+  .bkfil{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:6px}
+  .bkfil input{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:var(--card);color:var(--ink)}
+  .bkcount{font-size:13px;color:var(--mute);margin:8px 0 12px}
+  .bq{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+  .bq>summary{list-style:none;cursor:pointer;padding:12px 16px;display:flex;gap:12px;align-items:flex-start}
+  .bq>summary::-webkit-details-marker{display:none}
+  .bq>summary:focus-visible{outline:3px solid var(--pri);outline-offset:2px;border-radius:12px}
+  .bq[open]>summary{border-bottom:1px solid var(--line)}
+  .bqn{min-width:30px;font-size:12.5px;color:var(--mute);font-variant-numeric:tabular-nums;padding-top:2px}
+  .bqt{flex:1;min-width:0;font-weight:600;font-size:14.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+  .bqm{display:flex;gap:6px;align-items:center;flex-shrink:0;font-size:13px}
+  .mdot{display:inline-block;width:10px;height:10px;border-radius:50%}
+  .bqb{padding:14px 18px 16px}
+  .bqb .bqopts{list-style:none;padding:0;margin:0 0 12px}
+  .bqb .bqopts li{padding:7px 10px;border-radius:8px;font-size:14.5px;white-space:pre-wrap;overflow-wrap:anywhere}
+  .bqb .bqopts li.ok{background:var(--ok-soft);color:var(--ok-ink);font-weight:600}
+  .bqtools{display:flex;gap:8px;align-items:center;margin-top:12px}
   /* Ricerca globale */
   .srch{position:fixed;inset:0;z-index:50;background:rgba(15,18,30,.45);display:flex;justify-content:center;align-items:flex-start;padding:8vh 16px 16px}
   .srchbox{width:100%;max-width:720px;max-height:80vh;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden}
@@ -424,6 +442,7 @@
     .srch{padding:0}
     .srchbox{max-width:none;max-height:none;height:100%;border-radius:0;border:0}
     .lesacts .btn{flex:1 1 auto}
+    .bkfil{grid-template-columns:1fr}
   }
 </style>
 </head>
@@ -451,7 +470,7 @@
       <div class="stat"><b id="sLeft">8</b><small>Esami rimasti</small></div>
       <div class="stat"><b id="sDone">0</b><small>Domande studiate</small></div>
       <div class="stat"><b id="sAcc">–</b><small>Precisione</small></div>
-      <div class="stat"><b>🔥 1</b><small>Giorni di fila</small></div>
+      <div class="stat"><b id="sStreak">🔥 0</b><small>Giorni di fila</small></div>
     </div>
     <div class="quick">
       <button class="qbtn" id="homeSmart"><span class="qi">🧠</span><span><b>Ripasso Intelligente (20 domande)</b><small id="smartInfo"></small></span></button>
@@ -476,6 +495,8 @@
     <div class="tools" style="margin-top:16px">
       <button class="btn ghost" id="hubSmart">🧠 Ripasso intelligente</button>
       <button class="btn ghost" id="hubFlash">🃏 Flashcard</button>
+      <button class="btn ghost" id="hubBank">🗂 Sfoglia tutte le domande</button>
+      <button class="btn ghost" id="hubPrint">🖨 Esporta Scheda Ripasso</button>
     </div>
   </section>
 
@@ -566,6 +587,23 @@ Una lezione con lo stesso titolo di una già caricata viene aggiornata, non dupl
    </div>
   </section>
 
+  <!-- BANCA DOMANDE -->
+  <section id="bank" class="hide">
+    <button class="back" id="bkBack"></button>
+    <h1 id="bkTitle"></h1>
+    <p class="sub">Tutte le domande dell'esame: apri una domanda per vedere risposta, spiegazione e dispensa, stellinarla o aggiungere una nota.</p>
+    <div class="panel" style="max-width:none">
+      <div class="bkfil">
+        <input id="bkQ" type="search" placeholder="🔎 Cerca nel testo, opzioni, spiegazioni, dispense, note…" aria-label="Cerca nelle domande" autocomplete="off">
+        <select id="bkChap" aria-label="Capitolo"></select>
+        <select id="bkSrc" aria-label="Fonte"></select>
+      </div>
+      <div class="chips" id="bkState" role="group" aria-label="Stato" style="margin:12px 0 0"></div>
+    </div>
+    <p class="bkcount" id="bkCount" aria-live="polite"></p>
+    <div id="bkList"></div>
+  </section>
+
   <!-- FLASHCARD -->
   <section id="flash" class="hide">
     <div class="flwrap">
@@ -640,8 +678,10 @@ Una lezione con lo stesso titolo di una già caricata viene aggiornata, non dupl
 
   <!-- ERRORI -->
   <section id="errori" class="hide">
-    <h1>Ripasso errori 🔁</h1>
-    <p class="sub">Le domande sbagliate, dalla più sbagliata. Dopo 2 risposte corrette di fila escono dal ripasso.</p>
+    <div class="thead">
+      <div><h1>Ripasso errori 🔁</h1><p class="sub">Le domande sbagliate, dalla più sbagliata. Dopo 2 risposte corrette di fila escono dal ripasso.</p></div>
+      <button class="btn ghost sm" id="errPrint">🖨 Esporta Scheda Ripasso</button>
+    </div>
     <div id="errBody"></div>
   </section>
 
@@ -823,8 +863,29 @@ function recordResult(q,ok,pick){
     ...srsNext(prev,ok,now),                       // streak, ease, intervalDays, nextReview
     lastSeen:now
   };
+  markStudyDay();
   save();
   return ok;
+}
+/* ===== Giorni di studio (store.studyDays, date locali YYYY-MM-DD) e serie 🔥 ===== */
+const localDay=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function studyDays(){
+  if(!Array.isArray(store.studyDays)){
+    // prima volta: ricostruisce i giorni dallo storico delle risposte
+    const s=new Set(Object.values(store.questions||{}).map(e=>e&&e.lastSeen).filter(Boolean).map(t=>localDay(new Date(t))));
+    store.studyDays=[...s].sort().slice(-365);
+  }
+  return store.studyDays;
+}
+function markStudyDay(){
+  const d=studyDays(), t=localDay();
+  if(!d.includes(t)){d.push(t);d.sort();if(d.length>365)d.splice(0,d.length-365);}
+}
+function studyStreak(){
+  const set=new Set(studyDays()), d=new Date();
+  if(!set.has(localDay(d)))d.setDate(d.getDate()-1);   // oggi non hai ancora studiato: si conta da ieri
+  let n=0; while(set.has(localDay(d))){n++;d.setDate(d.getDate()-1);}
+  return n;
 }
 
 /* ===== Sessione attiva ===== */
@@ -971,6 +1032,7 @@ function refreshView(pm,pb){
   else if(v==="errori")renderErrors();
   else if(v==="tesi")renderThesis();
   else if(v==="import")renderImport();
+  else if(v==="bank"&&bkExam)renderBank();
   else if(v==="quiz"&&!testRunning())go(pm==="smart"?backView(pb):pm==="errori"?"errori":"studio");
 }
 
@@ -1010,7 +1072,7 @@ function genPin(){
 }
 
 /* ===== Navigazione ===== */
-const VIEWS=["home","examHub","lessons","quiz","flash","testSetup","result","errori","tesi","import"];
+const VIEWS=["home","examHub","lessons","quiz","flash","bank","testSetup","result","errori","tesi","import"];
 function show(id,nav){
   VIEWS.forEach(s=>$(s).classList.add("hide"));
   $(id).classList.remove("hide");
@@ -1087,6 +1149,9 @@ function renderHome(){
   $("sLeft").textContent=EXAMS.length;
   $("sDone").textContent=done;
   $("sAcc").textContent=done?Math.round(ok/done*100)+"%":"–";
+  const st=studyStreak();
+  $("sStreak").textContent=`🔥 ${st}`;
+  $("sStreak").title=st?`${st} ${st===1?"giorno":"giorni"} di studio consecutivi`:"Rispondi a una domanda o completa una lezione per iniziare la serie";
   renderHomeExtras();
 }
 
@@ -1299,11 +1364,11 @@ function renderLessons(){
       <button class="btn ghost" id="lesPrev" ${prev?`title="${esc(prev.title)}"`:"disabled"}>← Lezione precedente</button>
       <button class="btn" id="lesNext" ${next?`title="${esc(next.title)}"`:"disabled"}>Lezione successiva →</button>
     </div>`;
-  $("lesRead").onclick=()=>{cur.read=!cur.read;saveLessons();renderLessons();$("lesRead").focus();};
+  $("lesRead").onclick=()=>{cur.read=!cur.read;if(cur.read){markStudyDay();save();}saveLessons();renderLessons();$("lesRead").focus();};
   $("lesTrain").onclick=()=>startPractice(lq,{title:`🎯 ${cur.title}`,sub:`Domande collegate a questa lezione (${lq.length}), con spiegazione immediata.`,back:"lessons",exam:hubExam});
   $("lesFlash").onclick=()=>openFlash({qs:lq,title:cur.title,back:"lessons",exam:hubExam});
   $("lesPrev").onclick=()=>gotoLesson(idx-1);
-  $("lesNext").onclick=()=>{cur.read=true;gotoLesson(idx+1);};   // andando avanti la lezione corrente è letta
+  $("lesNext").onclick=()=>{cur.read=true;markStudyDay();save();gotoLesson(idx+1);};   // andando avanti la lezione corrente è letta
 }
 function gotoLesson(k){
   const list=lessonsOf(hubExam); if(k<0||k>=list.length)return;
@@ -2337,6 +2402,11 @@ function flushNotes(){
     const p=flNotePending; flNotePending=null;
     if(p)setMark(p.id,{note:p.val});
   }
+  if(bkNoteTimer){
+    clearTimeout(bkNoteTimer); bkNoteTimer=null;
+    const p=bkNotePending; bkNotePending=null;
+    if(p)setMark(p.id,{note:p.val});
+  }
 }
 
 /* ===== Capitoli (dal campo ref) e collegamento lezione → domande ===== */
@@ -2436,6 +2506,144 @@ function renderMastery(){
 $("homeSmart").onclick=()=>startSmart(null,"home");
 $("homeFlash").onclick=()=>openFlash({back:"home"});
 $("hubSmart").onclick=()=>startSmart(hubExam,"hub");
+$("hubBank").onclick=()=>openBank(hubExam);
+$("hubPrint").onclick=()=>printReview(hubExam);
+$("errPrint").onclick=()=>printReview(errFilter||null);
+
+/* ===== 🗂 Banca domande dell'esame ===== */
+const BK_STATES=[["all","Tutte"],["rev","🔴 Da rivedere"],["pro","🟠 In corso"],["mas","🟢 Padroneggiate"],["new","⚪ Nuove"],["flag","⭐ Stellinate"],["note","📝 Con Note"]];
+const MDOT={rev:"var(--ko)",pro:"var(--warn)",mas:"var(--ok)",new:"var(--line)"};
+const MLAB={rev:"Da rivedere",pro:"In corso",mas:"Padroneggiata",new:"Nuova"};
+let bkExam=null, bkState="all", bkShown=200, bkTimer=null, bkNoteTimer=null, bkNotePending=null, bkRows=[];
+function openBank(exam){
+  if(!questionsOf(exam).length){toast("Nessuna domanda per questo esame: importale prima.");return;}
+  bkExam=exam; bkState="all"; bkShown=200;
+  $("bkTitle").textContent=`🗂 Banca domande · ${exam}`; $("bkBack").textContent=`← Torna a ${exam}`;
+  $("bkQ").value="";
+  const ch=new Map(), sr=new Map();
+  questionsOf(exam).forEach(q=>{const c=chapterOf(q),s=srcOf(q);ch.set(c,(ch.get(c)||0)+1);sr.set(s,(sr.get(s)||0)+1);});
+  $("bkChap").innerHTML=`<option value="">Tutti i capitoli</option>`+[...ch.keys()].sort(chapterSort).map(k=>`<option value="${esc(k)}">${esc(k)} (${ch.get(k)})</option>`).join("");
+  $("bkSrc").innerHTML=`<option value="">Tutte le fonti</option>`+[...sr.keys()].map(k=>`<option value="${esc(k)}">${esc(k)} (${sr.get(k)})</option>`).join("");
+  show("bank","home"); renderBank(); $("bkQ").focus();
+}
+function bkMatchState(q,st){
+  if(st==="all")return true; if(st==="flag")return isFlag(q.id); if(st==="note")return !!noteOf(q.id);
+  return masteryOf(q.id)===st;
+}
+function bkFiltered(st){
+  const terms=$("bkQ").value.trim().toLowerCase().split(/\s+/).filter(Boolean), ch=$("bkChap").value, sr=$("bkSrc").value;
+  return questionsOf(bkExam).filter(q=>{
+    if(ch&&chapterOf(q)!==ch)return false;
+    if(sr&&srcOf(q)!==sr)return false;
+    if(!bkMatchState(q,st))return false;
+    if(!terms.length)return true;
+    const hay=[q.q,...q.o,stripHtml(q.e),q.d||"",q.ref||"",noteOf(q.id)].join("\n").toLowerCase();
+    return terms.every(t=>hay.includes(t));
+  });
+}
+function bkSummary(q,n){
+  const m=masteryOf(q.id);
+  return `<span class="bqn">${n}</span><span class="bqt">${esc(q.q.replace(/```[\w+#.-]*\n?/g,"").trim())}</span>
+    <span class="bqm"><span class="mdot" style="background:${MDOT[m]}" title="${MLAB[m]}" aria-label="${MLAB[m]}"></span>${isFlag(q.id)?'<span aria-label="Stellinata">⭐</span>':""}${noteOf(q.id)?'<span aria-label="Con nota">📝</span>':""}</span>`;
+}
+function bkBody(q){
+  const e=store.questions[q.id];
+  const stat=e?`${e.ok?"✓ Ultima risposta giusta":"✗ Ultima risposta sbagliata"} · sbagliata ${e.wrongCount||0} ${e.wrongCount===1?"volta":"volte"}`:"Mai risposta";
+  return `<div class="fltop" style="margin-bottom:10px"><span><span class="srctag">${esc(srcOf(q))}</span><span class="srctag">${esc(chapterOf(q))}</span></span><span>${stat}</span></div>
+    <div class="qtext" style="font-size:16px;margin-bottom:12px">${fmtQ(q.q)}</div>
+    <ol class="bqopts">${q.o.map((t,i)=>`<li class="${i===q.a?"ok":""}">${L[i]}. ${esc(t)}${i===q.a?" ✓":""}</li>`).join("")}</ol>
+    <div class="xsec"><h4 style="margin-top:6px">Spiegazione</h4><div>${explOf(q)}</div></div>
+    ${q.d?`<div class="xsec"><h4>Dalle dispense</h4><div class="md sm">${mdRender(q.d)}</div></div>`:""}
+    ${q.ref?`<p class="ref">📄 ${esc(q.ref)}</p>`:""}
+    <div class="notebox"><textarea data-bknote="${esc(q.id)}" placeholder="📝 Nota personale: un trucco per ricordarla…" aria-label="Nota personale">${esc(noteOf(q.id))}</textarea></div>
+    <div class="bqtools">${starBtn(q.id).replace('data-act="star"',`data-bkstar="${esc(q.id)}"`)}<span class="hint" style="margin:0">${isFlag(q.id)?"Tra le domande ostiche":"Stellina se è ostica"}</span></div>`;
+}
+function renderBank(){
+  const list=bkFiltered(bkState); bkRows=list;
+  $("bkState").innerHTML=BK_STATES.map(([k,l])=>`<button class="chip ${bkState===k?"on":""}" data-s="${k}" aria-pressed="${bkState===k}">${l} (${bkFiltered(k).length})</button>`).join("");
+  const tot=questionsOf(bkExam).length;
+  $("bkCount").textContent=list.length===tot?`${tot} domande`:`${list.length} di ${tot} domande`;
+  if(!list.length){$("bkList").innerHTML=`<div class="soon" style="padding:34px">Nessuna domanda con questi filtri.</div>`;return;}
+  const shown=list.slice(0,bkShown);
+  $("bkList").innerHTML=shown.map((q,i)=>`<details class="bq" data-id="${esc(q.id)}"><summary>${bkSummary(q,i+1)}</summary><div class="bqb"></div></details>`).join("")+
+    (list.length>bkShown?`<button class="btn ghost" id="bkMore" style="width:100%;margin-top:6px">Mostra altre ${Math.min(200,list.length-bkShown)} di ${list.length-bkShown}</button>`:"");
+  if($("bkMore"))$("bkMore").onclick=()=>{bkShown+=200;renderBank();};
+}
+const bkQ=id=>questionsOf(bkExam).find(q=>q.id===id);
+// il contenuto di ogni domanda si genera solo quando la apri (liste lunghe restano veloci)
+$("bkList").addEventListener("toggle",e=>{
+  const d=e.target; if(!d.classList||!d.classList.contains("bq")||!d.open)return;
+  const q=bkQ(d.dataset.id); if(q&&!d.querySelector(".bqb").childElementCount)d.querySelector(".bqb").innerHTML=bkBody(q);
+},true);
+$("bkList").addEventListener("click",e=>{
+  const s=e.target.closest("[data-bkstar]"); if(!s)return;
+  const id=s.dataset.bkstar, q=bkQ(id); if(!q)return;
+  toggleFlag(id);
+  const d=s.closest(".bq"), idx=d.querySelector(".bqn").textContent;
+  d.querySelector("summary").innerHTML=bkSummary(q,idx);
+  d.querySelector(".bqb").innerHTML=bkBody(q);
+  d.querySelector("[data-bkstar]").focus();
+});
+$("bkList").addEventListener("input",e=>{
+  const t=e.target; if(!t.dataset||!t.dataset.bknote)return;
+  const id=t.dataset.bknote, val=t.value; bkNotePending={id,val};
+  clearTimeout(bkNoteTimer);
+  bkNoteTimer=setTimeout(()=>{
+    bkNoteTimer=null; bkNotePending=null; setMark(id,{note:val});
+    const d=t.closest(".bq"), q=bkQ(id); if(d&&q)d.querySelector("summary").innerHTML=bkSummary(q,d.querySelector(".bqn").textContent);
+  },400);
+});
+$("bkQ").oninput=()=>{clearTimeout(bkTimer);bkTimer=setTimeout(()=>{bkShown=200;renderBank();},150);};
+$("bkChap").onchange=$("bkSrc").onchange=()=>{bkShown=200;renderBank();};
+$("bkState").onclick=e=>{const b=e.target.closest(".chip");if(!b)return;bkState=b.dataset.s;bkShown=200;renderBank();$("bkState").querySelector(".chip.on")?.focus();};
+$("bkBack").onclick=()=>{hubExam=bkExam;go("hub");};
+
+/* ===== 🖨 Scheda Ripasso (errori + ⭐) stampabile / PDF ===== */
+function printReview(exam){
+  flushNotes();
+  const pool=exam?questionsOf(exam).map(q=>({q,exam})):allQuestions();
+  const items=pool.filter(({q})=>inReview(q.id)||isFlag(q.id));
+  if(!items.length){toast("Nessuna domanda sbagliata o stellinata da esportare.");return;}
+  const byExam=new Map();
+  items.forEach(it=>{if(!byExam.has(it.exam))byExam.set(it.exam,new Map());const m=byExam.get(it.exam),c=chapterOf(it.q);if(!m.has(c))m.set(c,[]);m.get(c).push(it.q);});
+  let n=0;
+  const body=[...byExam].map(([ex,chs])=>`<h2>${esc(ex)}</h2>`+[...chs.keys()].sort(chapterSort).map(c=>`<h3>${esc(c)}</h3>`+chs.get(c).map(q=>{
+    n++; const e=store.questions[q.id], tags=[];
+    if(inReview(q.id))tags.push(`❌ sbagliata ${e.wrongCount} ${e.wrongCount===1?"volta":"volte"}`);
+    if(isFlag(q.id))tags.push("⭐ ostica");
+    return `<div class="q"><div class="qh"><b>${n}.</b> <span class="tags">${tags.join(" · ")}${q.ref?` · 📄 ${esc(q.ref)}`:""}</span></div>
+      <div class="qt">${fmtQ(q.q)}</div>
+      <ol>${q.o.map((t,i)=>`<li class="${i===q.a?"ok":""}">${L[i]}. ${esc(t)}${i===q.a?" ✓":""}</li>`).join("")}</ol>
+      ${q.e?`<div class="ex"><b>Spiegazione:</b> ${q.e}</div>`:""}
+      ${noteOf(q.id)?`<div class="note"><b>📝 Nota:</b> ${esc(noteOf(q.id))}</div>`:""}</div>`;
+  }).join("")).join("")).join("");
+  const title=`Scheda Ripasso${exam?" · "+exam:""}`;
+  const html=`<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>
+    *{box-sizing:border-box}body{font:13.5px/1.5 Georgia,"Times New Roman",serif;color:#111;margin:28px auto;max-width:780px;padding:0 18px}
+    header{border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:18px}h1{font:700 22px system-ui,sans-serif;margin:0 0 4px}
+    header p{margin:0;color:#555;font:13px system-ui,sans-serif}h2{font:700 17px system-ui,sans-serif;margin:24px 0 6px;border-bottom:1px solid #999}
+    h3{font:600 13.5px system-ui,sans-serif;color:#444;margin:14px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+    .q{border:1px solid #ccc;border-radius:8px;padding:10px 14px;margin:0 0 10px;break-inside:avoid;page-break-inside:avoid}
+    .qh{font:12px system-ui,sans-serif;color:#555;margin-bottom:4px}.qh b{color:#111;font-size:13px}.qt{font-weight:700;white-space:pre-wrap}
+    ol{list-style:none;padding:0;margin:6px 0}li{padding:2px 6px;white-space:pre-wrap}li.ok{background:#e6f4ea;font-weight:700;border-radius:4px}
+    .ex{margin-top:6px}.note{margin-top:6px;background:#fff6d6;padding:6px 8px;border-radius:6px}
+    pre{white-space:pre-wrap;background:#f4f4f4;padding:6px 8px;border-radius:6px;font:12px ui-monospace,Consolas,monospace}
+    .bar{position:sticky;top:0;background:#fff;padding:10px 0;margin-bottom:10px;font:14px system-ui,sans-serif}
+    .bar button{font:600 14px system-ui,sans-serif;padding:8px 16px;border-radius:8px;border:0;background:#4f46e5;color:#fff;cursor:pointer}
+    @media print{.bar{display:none}body{margin:0 auto}}
+  </style></head><body>
+    <div class="bar"><button onclick="window.print()">🖨 Stampa / Salva PDF</button></div>
+    <header><h1>${esc(title)}</h1><p>${n} domande da ripassare (errori ancora aperti e stellinate ⭐) · ${new Date().toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"})}</p></header>
+    ${body}</body></html>`;
+  const w=window.open("","_blank");
+  if(w){w.document.open();w.document.write(html);w.document.close();w.focus();setTimeout(()=>{try{w.print();}catch(e){}},400);return;}
+  // popup bloccato: stampa da un frame nascosto
+  const f=document.createElement("iframe");
+  f.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  document.body.appendChild(f);
+  f.contentDocument.open(); f.contentDocument.write(html); f.contentDocument.close();
+  setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print();}catch(e){toast("Stampa non disponibile in questo browser.");}setTimeout(()=>f.remove(),2000);},400);
+}
 $("hubFlash").onclick=()=>openFlash({exam:hubExam,back:"hub"});
 $("tSmart").onclick=()=>startSmart($("tExam").value||null,"test");
 
