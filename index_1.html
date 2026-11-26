@@ -176,6 +176,7 @@
   /* Errori */
   .erow{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);font-size:14.5px}
   .erow:last-child{border-bottom:0}
+  .erside{display:flex;align-items:center;gap:4px;flex-shrink:0}
   .erow small{display:block;color:var(--mute);font-size:12.5px;margin-top:2px}
   /* Tesi */
   .thead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
@@ -342,6 +343,13 @@
   .btn.flko{background:var(--ko);color:var(--on-solid)}
   .btn.flok{background:var(--ok-ink);color:var(--on-solid)}
   .fldone{max-width:720px;margin:0 auto}
+  /* Immagini e diagrammi nelle domande */
+  .qimg{display:block;max-width:100%;max-height:340px;width:auto;height:auto;margin:10px 0;border-radius:10px;border:1px solid var(--line);background:#fff;padding:4px}
+  .stackbox{display:flex;flex-direction:column;gap:4px;max-width:250px;margin:10px 0;font:600 13px system-ui,sans-serif;white-space:normal}
+  .stackbox div{padding:7px 12px;border-radius:8px;text-align:center;color:#fff}
+  .stackbox .mask{background:#111827;color:#111827;letter-spacing:2px;user-select:none}
+  :root[data-theme="dark"] .stackbox .mask{background:#000;color:#000;outline:1.5px dashed var(--mute);outline-offset:-1.5px}
+  .stackcap{font:600 11.5px system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin-bottom:2px}
   /* Banca domande */
   .bkfil{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:6px}
   .bkfil input{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:var(--card);color:var(--ink)}
@@ -557,7 +565,7 @@ Una lezione con lo stesso titolo di una già caricata viene aggiornata, non dupl
   <section id="quiz" class="hide">
    <div class="qstage" id="qstage">
     <div class="qmain" id="qmain">
-    <div class="qback"><button class="back" id="backHome"></button><button class="back hide" id="restartTest">🔄 Ricomincia test</button><button class="back hide" id="restartStudy">🔄 Ricomincia da capo</button></div>
+    <div class="qback"><button class="back" id="backHome"></button><button class="back hide" id="restartTest">🔄 Ricomincia test</button><button class="back hide" id="restartStudy">🔄 Ricomincia da capo</button><button class="back hide" id="dismissErr">🗑 Togli dal ripasso</button></div>
     <h1 id="qTitle"></h1>
     <p class="sub" id="qSub"></p>
     <div class="chips hide" id="qSrc" role="group" aria-label="Filtra per fonte"></div>
@@ -861,6 +869,7 @@ function recordResult(q,ok,pick){
     pick:pick===undefined?(prev?.pick??null):pick, ok,
     wrongCount:(prev?.wrongCount||0)+(ok?0:1),     // storico cumulativo
     ...srsNext(prev,ok,now),                       // streak, ease, intervalDays, nextReview
+    ...(ok&&prev?.reviewOff?{reviewOff:true}:{}),  // tolta dal ripasso: rientra solo se la sbagli di nuovo
     lastSeen:now
   };
   markStudyDay();
@@ -1203,6 +1212,14 @@ function clearStudy(name){
   const d=readStudy(); delete d.exams[name];
   try{localStorage.setItem(STUDY_KEY,JSON.stringify(d));}catch(e){}
 }
+$("dismissErr").onclick=()=>{
+  if(session.mode!=="errori")return;
+  const q=session.queue[session.index]; if(!q)return;
+  dismissErrors([q.id]);
+  session.queue.splice(session.index,1); delete session.answers[q.id];
+  if(!session.queue.length){toast("Domanda tolta: il ripasso è finito.");go("errori");return;}
+  renderQ(); toast("Domanda tolta dal ripasso.");
+};
 $("restartStudy").onclick=()=>{
   if(session.mode!=="studio"||!session.exam)return;
   if(!confirm("Ricominciare lo studio di questo esame dalla prima domanda? Le risposte di questa sessione vengono azzerate; lo storico di progressi ed errori resta."))return;
@@ -1564,6 +1581,7 @@ function renderQ(){
   if(isTest)$("qTimer").classList.toggle("low",remaining()<=60);
   $("restartTest").classList.toggle("hide",!isTest);
   $("restartStudy").classList.toggle("hide",mode!=="studio");
+  $("dismissErr").classList.toggle("hide",mode!=="errori");
   if(mode==="studio")saveStudy();   // punto di arrivo e risposte sempre aggiornati
   if(isTest)saveActiveTest();   // indice e risposte sempre aggiornati in sp_active_test
 
@@ -1832,7 +1850,17 @@ $("rErr").onclick=()=>go("errori");
 
 /* ===== Ripasso errori ===== */
 const wc=id=>store.questions[id]?.wrongCount||0;
-const inReview=id=>wc(id)>0&&(store.questions[id]?.streak||0)<2; // esce dopo 2 corrette di fila
+const inReview=id=>wc(id)>0&&(store.questions[id]?.streak||0)<2&&!store.questions[id]?.reviewOff; // esce dopo 2 corrette di fila o se la togli a mano
+let errUndo=[];   // ultime domande tolte, per "Annulla"
+function dismissErrors(ids){
+  ids=ids.filter(id=>store.questions[id]); if(!ids.length)return;
+  ids.forEach(id=>{store.questions[id].reviewOff=true;});
+  errUndo=ids; save();
+}
+function undoDismiss(){
+  errUndo.forEach(id=>{if(store.questions[id])delete store.questions[id].reviewOff;});
+  const n=errUndo.length; errUndo=[]; save(); return n;
+}
 function getErrors(exam){
   return allQuestions().filter(x=>(!exam||x.exam===exam)&&inReview(x.q.id))
             .sort((a,b)=>wc(b.q.id)-wc(a.q.id)||(store.questions[b.q.id].lastSeen-store.questions[a.q.id].lastSeen));
@@ -1840,7 +1868,12 @@ function getErrors(exam){
 let errFilter="";
 function renderErrors(){
   const all=getErrors("");
-  if(!all.length){$("errBody").innerHTML=`<div class="soon">Nessun errore da ripassare! 🎉</div>`;return;}
+  const undoBtn=errUndo.length?`<button class="btn ghost sm" id="eUndo">↩ Annulla rimozione (${errUndo.length})</button>`:"";
+  if(!all.length){
+    $("errBody").innerHTML=`<div class="soon">Nessun errore da ripassare! 🎉${undoBtn?`<br><br>${undoBtn}`:""}</div>`;
+    if(undoBtn)$("eUndo").onclick=()=>{const n=undoDismiss();renderErrors();toast(`${n} ${n===1?"domanda rimessa":"domande rimesse"} nel ripasso.`);};
+    return;
+  }
   const exams=EXAMS.map(x=>({n:x.n,c:all.filter(e=>e.exam===x.n).length})).filter(x=>x.c);
   if(errFilter&&!exams.some(x=>x.n===errFilter))errFilter="";
   const list=getErrors(errFilter);
@@ -1851,14 +1884,28 @@ function renderErrors(){
           <option value="">Tutti gli esami (${all.length})</option>
           ${exams.map(x=>`<option value="${esc(x.n)}">${esc(x.n)} (${x.c})</option>`).join("")}
         </select></div>
-      <button class="btn" id="eStart">Inizia ripasso (${list.length} ${list.length===1?"domanda":"domande"})</button>
+      <div class="tools">
+        <button class="btn" id="eStart">Inizia ripasso (${list.length} ${list.length===1?"domanda":"domande"})</button>
+        <button class="btn ghost" id="eClear">🗑 Rimuovi ${errFilter?"quelle di questo esame":"tutte"} (${list.length})</button>
+        ${undoBtn}
+      </div>
       <div style="margin-top:22px">
-        ${list.map(x=>{const w=wc(x.q.id);return `<div class="erow"><div>${fmtQ(x.q.q)}<small>${esc(x.exam)} · ${esc(srcOf(x.q))}</small></div><span class="badge">${w}×</span></div>`}).join("")}
+        ${list.map(x=>{const w=wc(x.q.id);return `<div class="erow"><div>${fmtQ(x.q.q)}<small>${esc(x.exam)} · ${esc(srcOf(x.q))}</small></div><span class="erside"><span class="badge">${w}×</span><button class="iconbtn" data-dismiss="${esc(x.q.id)}" title="Togli dal ripasso" aria-label="Togli dal ripasso">✕</button></span></div>`}).join("")}
       </div>
     </div>`;
   $("eFilter").value=errFilter;
   $("eFilter").onchange=e=>{errFilter=e.target.value;renderErrors();$("eFilter").focus();};
   $("eStart").onclick=startReview;
+  $("eClear").onclick=()=>{
+    if(!confirm(`Togliere ${list.length} ${list.length===1?"domanda":"domande"} dal ripasso errori?\nLo storico resta; una domanda rientra se la sbagli di nuovo.`))return;
+    dismissErrors(list.map(x=>x.q.id)); renderErrors(); toast("Domande tolte dal ripasso.");
+  };
+  if($("eUndo"))$("eUndo").onclick=()=>{const n=undoDismiss();renderErrors();toast(`${n} ${n===1?"domanda rimessa":"domande rimesse"} nel ripasso.`);};
+  $("errBody").querySelectorAll("[data-dismiss]").forEach(b=>b.onclick=()=>{
+    dismissErrors([b.dataset.dismiss]); renderErrors();
+    ($("errBody").querySelector("[data-dismiss]")||$("eUndo")||$("eFilter"))?.focus();
+    toast("Domanda tolta dal ripasso.");
+  });
 }
 function startReview(){
   const list=getErrors(errFilter);
@@ -2023,15 +2070,48 @@ function fmtQ(s){
       // testo: tolgo l'a capo che tocca un blocco di codice, il <pre> va già a capo da solo
       if(i>0)p=p.replace(/^[ \t]*\n/,"");
       if(i<parts.length-1)p=p.replace(/\n[ \t]*$/,"");
-      return esc(p);
+      return richText(p);
     }
     const code=(/^[\w+#.-]*[ \t]*\n/.test(p)?p.replace(/^[^\n]*\n/,""):p).replace(/\n[ \t]*$/,"");
     return `<pre class="code"><code>${esc(code)}</code></pre>`;
   }).join("");
 }
+/* Immagini <img src="https://…"> e pile [OSI:…] / [TCPIP:…] nel testo delle domande.
+   Il testo viene letto prima dell'escape: si riconoscono solo questi due elementi, con URL
+   http/https validato, e tutto il resto passa da esc(). Nessun altro HTML viene attivato. */
+const RICH_RE=/<img\b[^>]*?\bsrc\s*=\s*(["'])(.*?)\1[^>]*>|\[(OSI|TCPIP)\s*:([^\]\n]*)\]/gi;
+const STACK_COLORS=["#dc2626","#ea580c","#ca8a04","#16a34a","#0891b2","#2563eb","#7c3aed","#db2777"];
+function safeImgUrl(src){
+  try{const u=new URL(String(src).replace(/&amp;/g,"&").trim());return /^https?:$/.test(u.protocol)?u.href:null;}catch(e){return null;}
+}
+function stackHtml(kind,body){
+  const layers=body.split("|").map(s=>s.trim()).filter(Boolean).slice(0,8);
+  if(!layers.length)return null;
+  const name=kind.toUpperCase()==="OSI"?"Pila OSI":"Pila TCP/IP";
+  const rows=layers.map((l,i)=>/^\?{2,}$/.test(l)
+    ?`<div class="mask" aria-label="livello nascosto">█████</div>`
+    :`<div style="background:${STACK_COLORS[i%STACK_COLORS.length]}">${esc(l)}</div>`).join("");
+  return `<div class="stackbox" role="img" aria-label="${name}: ${esc(layers.map(l=>/^\?{2,}$/.test(l)?"livello nascosto":l).join(", "))}"><span class="stackcap">${name}</span>${rows}</div>`;
+}
+function richText(s){
+  let out="",last=0,m; RICH_RE.lastIndex=0;
+  while((m=RICH_RE.exec(s))){
+    let rep=null;
+    if(m[2]!==undefined){
+      const url=safeImgUrl(m[2]);
+      if(url){const alt=(m[0].match(/\balt\s*=\s*(["'])(.*?)\1/i)||[])[2];rep=`<img class="qimg" src="${esc(url)}" alt="${esc(alt||"Immagine della domanda")}" loading="lazy" referrerpolicy="no-referrer">`;}
+    }else rep=stackHtml(m[3],m[4]);
+    out+=esc(s.slice(last,m.index))+(rep??esc(m[0]));
+    last=m.index+m[0].length;
+  }
+  return out+esc(s.slice(last));
+}
+const hasMedia=s=>/<img\b|\[(OSI|TCPIP)\s*:/i.test(String(s||""));
+// Versione solo testo (anteprime, elenchi, ricerca)
+const plainQ=s=>String(s||"").replace(/<img\b[^>]*>/gi," 🖼️ ").replace(/\[(OSI|TCPIP)\s*:[^\]\n]*\]/gi,(_,k)=>` [pila ${k.toUpperCase()==="OSI"?"OSI":"TCP/IP"}] `).replace(/```[\w+#.-]*\n?/g,"").replace(/[ \t]+/g," ").trim();
 const short=s=>s.length>60?s.slice(0,57)+"…":s;
 // Confronto tollerante: ignora <img>, <br>, marcatori ``` e apostrofi/virgolette tipografiche
-const norm=s=>String(s||"").replace(/<img[^>]*>/gi," ").replace(/<br\s*\/?>/gi," ").replace(/```[\w+#.-]*\s*/g," ").replace(/[’‘]/g,"'").replace(/[“”]/g,'"').toLowerCase().replace(/\s+/g," ").trim();
+const norm=s=>String(s||"").replace(/<img[^>]*>/gi," ").replace(/\[(?:OSI|TCPIP)\s*:[^\]\n]*\]/gi," ").replace(/<br\s*\/?>/gi," ").replace(/```[\w+#.-]*\s*/g," ").replace(/[’‘]/g,"'").replace(/[“”]/g,'"').toLowerCase().replace(/\s+/g," ").trim();
 // Escape completo, poi riattiva solo i tag base senza attributi (<b>, <i>, <code>) e **grassetto**
 const mdLite=s=>esc(s).replace(/&lt;(\/?(?:b|i|code))&gt;/gi,"<$1>").replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/\n+/g,"<br>");
 function hash(s){let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193);}return (h>>>0).toString(36);}
@@ -2141,22 +2221,52 @@ function parseJSON(src){
 
 /* Assegna id stabili (hash di esame+testo) e salta i doppioni */
 const plainLen=html=>String(html||"").replace(/<[^>]+>/g,"").replace(/&[a-z#0-9]+;/gi," ").trim().length;
+const RICH_Q=/<img\b|\[(OSI|TCPIP):|```/i;
+// Chiave base: enunciato senza codice/immagini/pile + opzioni + risposta corretta
+function baseKey(qObj){
+  const t=String(qObj.q||"").replace(/```[\s\S]*?```/g," ").replace(/<img[^>]*>/gi," ").replace(/\[(OSI|TCPIP):[^\]]*\]/gi," ")
+    .replace(/[’‘]/g,"'").replace(/[“”]/g,'"').toLowerCase().replace(/\s+/g," ").trim();
+  const o=(qObj.o||[]).map(x=>String(x).toLowerCase().replace(/\s+/g," ").trim()).join("|");
+  return t+"||"+o+"||"+qObj.a;
+}
+// Campi da aggiornare su una domanda esistente (id e storico non cambiano)
+function richPatch(t,it,forceQ){
+  const patch={};
+  if(it.d&&it.d!==t.d)patch.d=it.d;
+  if(it.ref&&it.ref!==t.ref)patch.ref=it.ref;
+  if(it.e){const ne=mdLite(it.e);if(ne!==t.e&&it.e.length>plainLen(t.e))patch.e=ne;}
+  // testo arricchito con immagini, diagrammi o codice: sostituisce quello semplice
+  if(it.q!==t.q&&(forceQ||(RICH_Q.test(it.q)&&!RICH_Q.test(t.q))))patch.q=it.q;
+  return patch;
+}
 function prepare(exam,items,defSrc){
   // domande importate già presenti, aggiornabili (quelle integrate nel codice no)
   const updatable=new Map(importedOf(exam).map(q=>[norm(q.q),q]));
   const existing=new Set(questionsOf(exam).map(q=>norm(q.q)));
   const ids=new Set([...allQuestions().map(x=>x.q.id),...Object.values(custom.exams).flat().map(q=>q.id)]);
+  // Ripiego per chiave base (enunciato senza codice/immagini/pile + opzioni + risposta).
+  // Vale solo per domande già importate che NON hanno ancora codice, immagini o pile, e solo se la
+  // chiave è unica: così si aggiorna la versione "povera" della domanda, ma due domande con lo stesso
+  // enunciato e contenuto diverso ("Cosa stampa questo codice?") non vengono mai fuse tra loro.
+  const updatableByBase=new Map(), baseDup=new Set();
+  importedOf(exam).filter(q=>!RICH_Q.test(q.q)).forEach(q=>{
+    const bk=baseKey(q);
+    if(updatableByBase.has(bk))baseDup.add(bk); else updatableByBase.set(bk,q);
+  });
   const out=[], updates=[], touched=new Set(); let dups=0;
   for(const it of items){
-    const k=norm(it.q);
+    let k=norm(it.q);
+    if(!existing.has(k)&&RICH_Q.test(it.q)){
+      const bk=baseKey(it), t0=updatableByBase.get(bk);
+      if(t0&&!baseDup.has(bk)&&!touched.has(t0.id)){
+        updates.push({id:t0.id,q:t0.q,patch:richPatch(t0,it,true)});
+        touched.add(t0.id); existing.add(k);   // un secondo elemento identico nello stesso import è un doppione
+        continue;
+      }
+    }
     if(existing.has(k)){
       // stessa domanda: aggiorno d/ref ed e (se più ricca) mantenendo id e storico
-      const t=updatable.get(k), patch={};
-      if(t&&!touched.has(t.id)){
-        if(it.d&&it.d!==t.d)patch.d=it.d;
-        if(it.ref&&it.ref!==t.ref)patch.ref=it.ref;
-        if(it.e){const ne=mdLite(it.e);if(ne!==t.e&&it.e.length>plainLen(t.e))patch.e=ne;}
-      }
+      const t=updatable.get(k), patch=t&&!touched.has(t.id)?richPatch(t,it,false):{};
       if(Object.keys(patch).length){updates.push({id:t.id,q:t.q,patch});touched.add(t.id);}
       else dups++;
       continue;
@@ -2189,13 +2299,13 @@ function runPreview(){
   const {out,dups,updates}=prepare(exam,items,cleanSrc($("impSrc").value));
   impParsed={exam,out,updates};
   const nU=updates.length, saveLbl=out.length&&nU?`Salva ${out.length} nuove e aggiorna ${nU}`:nU?`Aggiorna ${nU} ${nU===1?"domanda":"domande"}`:`Salva ${out.length} ${out.length===1?"domanda":"domande"}`;
-  const what=p=>[p.d!==undefined&&"dispense",p.ref!==undefined&&"riferimento",p.e!==undefined&&"spiegazione"].filter(Boolean).join(", ");
+  const what=p=>[p.q!==undefined&&"testo con immagine/diagramma/codice",p.d!==undefined&&"dispense",p.ref!==undefined&&"riferimento",p.e!==undefined&&"spiegazione"].filter(Boolean).join(", ");
   const card=(q,k)=>`<div class="pv"><span class="srctag">${esc(q.src)}</span><b>${k+1}. ${fmtQ(q.q)}</b><ol>${q.o.map((t,i)=>`<li class="${i===q.a?"ok":""}">${L[i]}) ${esc(t)}${i===q.a?" ✓":""}</li>`).join("")}</ol><div class="pe">${q.e||"<i>Nessuna spiegazione</i>"}</div></div>`;
   const MAXP=300; // limite card renderizzate, per fluidità con banche molto grandi
   $("impPreview").innerHTML=`<div class="pvwrap">
-    <div class="pvhead"><p class="psum"><b>${out.length}</b> ${out.length===1?"nuova domanda riconosciuta":"nuove domande riconosciute"}${nU?` · <b>${nU}</b> ${nU===1?"domanda aggiornata":"domande aggiornate"} con dispense`:""}${dups?` · ${dups} già presenti (saltate)`:""}${errs.length?` · <span class="kotxt">${errs.length} da correggere</span>`:""} <small>(formato ${isJson?"JSON":"testo"})</small></p>
+    <div class="pvhead"><p class="psum"><b>${out.length}</b> ${out.length===1?"nuova domanda riconosciuta":"nuove domande riconosciute"}${nU?` · <b>${nU}</b> ${nU===1?"domanda esistente aggiornata":"domande esistenti aggiornate"}`:""}${dups?` · ${dups} già presenti (saltate)`:""}${errs.length?` · <span class="kotxt">${errs.length} da correggere</span>`:""} <small>(formato ${isJson?"JSON":"testo"})</small></p>
       <button class="btn" id="impSave" ${out.length||nU?"":"disabled"}>${saveLbl} in ${esc(exam)}</button></div>
-    ${nU?`<details class="fmt" style="margin:0 0 14px"><summary>${nU} ${nU===1?"domanda esistente verrà aggiornata":"domande esistenti verranno aggiornate"} (id e storico invariati)</summary><div class="pvlist" style="max-height:220px;margin-top:10px;background:var(--card)">${updates.map(u=>`<div class="lv"><span>${esc(short(u.q))}</span><small>${what(u.patch)}</small></div>`).join("")}</div></details>`:""}
+    ${nU?`<details class="fmt" style="margin:0 0 14px"><summary>${nU} ${nU===1?"domanda esistente verrà aggiornata":"domande esistenti verranno aggiornate"} (id e storico invariati)</summary><div class="pvlist" style="max-height:220px;margin-top:10px;background:var(--card)">${updates.map(u=>`<div class="lv"><span>${esc(short(plainQ(u.q)))}</span><small>${what(u.patch)}</small></div>`).join("")}</div></details>`:""}
     ${errs.length?`<div class="errbox"><b>Queste non verranno salvate:</b><ul>${errs.slice(0,30).map(e=>`<li>${esc(e)}</li>`).join("")}</ul>${errs.length>30?`<p>…e altre ${errs.length-30}.</p>`:""}</div>`:""}
     ${out.length?`<div class="pvlist" tabindex="0" aria-label="Anteprima domande">${out.slice(0,MAXP).map(card).join("")}
       ${out.length>MAXP?`<p class="hint" style="margin:8px 4px 0">…e altre ${out.length-MAXP} domande.</p>`:""}</div>`:""}
@@ -2543,8 +2653,8 @@ function bkFiltered(st){
 }
 function bkSummary(q,n){
   const m=masteryOf(q.id);
-  return `<span class="bqn">${n}</span><span class="bqt">${esc(q.q.replace(/```[\w+#.-]*\n?/g,"").trim())}</span>
-    <span class="bqm"><span class="mdot" style="background:${MDOT[m]}" title="${MLAB[m]}" aria-label="${MLAB[m]}"></span>${isFlag(q.id)?'<span aria-label="Stellinata">⭐</span>':""}${noteOf(q.id)?'<span aria-label="Con nota">📝</span>':""}</span>`;
+  return `<span class="bqn">${n}</span><span class="bqt">${esc(plainQ(q.q))}</span>
+    <span class="bqm"><span class="mdot" style="background:${MDOT[m]}" title="${MLAB[m]}" aria-label="${MLAB[m]}"></span>${isFlag(q.id)?'<span aria-label="Stellinata">⭐</span>':""}${hasMedia(q.q)?'<span aria-label="Con immagine o diagramma">🖼️</span>':""}${noteOf(q.id)?'<span aria-label="Con nota">📝</span>':""}</span>`;
 }
 function bkBody(q){
   const e=store.questions[q.id];
@@ -2680,7 +2790,7 @@ function flPool(mode){
   let qs=ex?questionsOf(ex):allQuestions().map(x=>x.q);
   if(ch)qs=qs.filter(q=>chapterOf(q)===ch);
   const f={all:()=>true,due:q=>{const e=store.questions[q.id];return !!e&&(!e.ok||isDue(q.id));},
-    wrong:q=>{const e=store.questions[q.id];return !!e&&(e.wrongCount||0)>0&&(e.streak||0)<2;},flag:q=>isFlag(q.id),note:q=>!!noteOf(q.id)}[mode||flMode];
+    wrong:q=>inReview(q.id),flag:q=>isFlag(q.id),note:q=>!!noteOf(q.id)}[mode||flMode];
   return qs.filter(f);
 }
 function updateFlCount(){
@@ -2824,7 +2934,7 @@ const stripHtml=s=>String(s||"").replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").
 function buildSearchIndex(){
   const F=(label,text)=>{const t=String(text||"").replace(/\s+/g," ").trim();return [label,t,t.toLowerCase()];};
   return {
-    q:allQuestions().map(({q,exam})=>({q,exam,f:[F("Domanda",q.q.replace(/```[\w+#.-]*/g," ")),...q.o.map((o,i)=>F(`Opzione ${L[i]}`,o)),F("Spiegazione",stripHtml(q.e)),F("Dispensa",q.d),F("Riferimento",q.ref),F("Nota",noteOf(q.id))]})),
+    q:allQuestions().map(({q,exam})=>({q,exam,f:[F("Domanda",plainQ(q.q)),...q.o.map((o,i)=>F(`Opzione ${L[i]}`,o)),F("Spiegazione",stripHtml(q.e)),F("Dispensa",q.d),F("Riferimento",q.ref),F("Nota",noteOf(q.id))]})),
     l:EXAMS.flatMap(x=>lessonsOf(x.n).map(l=>({l,exam:x.n,f:[F("Titolo",l.title),F("Testo",String(l.body).replace(/[#>*_`|]+/g," "))]})))
   };
 }
