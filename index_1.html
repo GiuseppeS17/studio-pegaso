@@ -2237,7 +2237,7 @@ const RICH_Q=/<img\b|\[(OSI|TCPIP):|```/i;
 // Testo senza codice, immagini e pile (a capo conservati per ricavare l'ultima riga)
 const cleanStem=s=>String(s||"").replace(/```[\s\S]*?```/g,"\n").replace(/<img[^>]*>/gi," ").replace(/\[(OSI|TCPIP):[^\]]*\]/gi,"\n")
   .replace(/[’‘]/g,"'").replace(/[“”]/g,'"').toLowerCase();
-const flat=s=>s.replace(/\s+/g," ").trim();
+const flat=s=>s.replace(/\s*([,;:])\s*/g,"$1 ").replace(/\s+/g," ").trim();   // "codice :" = "codice:" 
 const optAns=q=>"||"+(q.o||[]).map(x=>flat(String(x).toLowerCase())).join("|")+"||"+q.a;
 function baseKey(qObj){return flat(cleanStem(qObj.q))+optAns(qObj);}
 // Chiave secondaria: solo l'ultima riga non vuota dell'enunciato (es. "la seguente porzione di codice:")
@@ -2267,7 +2267,11 @@ function prepare(exam,items,defSrc){
   // codice/immagini/pile non sono mai candidate, quindi non vengono sovrascritte.
   const qBase=new Map(), qTail=new Map(), taken=new Set();
   const enqueue=(m,key,q)=>{if(!m.has(key))m.set(key,[]);m.get(key).push(q);};
-  importedOf(exam).filter(q=>!RICH_Q.test(q.q)).forEach(q=>{enqueue(qBase,baseKey(q),q);enqueue(qTail,tailKey(q),q);});
+  // Candidate: tutte le domande importate tranne quelle con pile [OSI:]/[TCPIP:] e quelle che un elemento
+  // di questo import riconosce già col testo esatto (verranno aggiornate da quell'elemento, non rubate).
+  const exactIn=new Set(items.map(it=>norm(it.q)));
+  importedOf(exam).filter(q=>!/\[(OSI|TCPIP)\s*:/i.test(q.q)&&!exactIn.has(norm(q.q)))
+    .forEach(q=>{enqueue(qBase,baseKey(q),q);enqueue(qTail,tailKey(q),q);});
   const dequeue=(m,key)=>{
     const a=m.get(key); if(!a)return null;
     while(a.length&&(taken.has(a[0].id)||touched.has(a[0].id)))a.shift();
@@ -2276,8 +2280,9 @@ function prepare(exam,items,defSrc){
   const out=[], updates=[], touched=new Set(); let dups=0;
   for(const it of items){
     let k=norm(it.q);
-    if(!existing.has(k)&&RICH_Q.test(it.q)){
-      const t0=dequeue(qBase,baseKey(it))||dequeue(qTail,tailKey(it));
+    if(!existing.has(k)){
+      // chiave base per tutti; chiave di coda (solo ultima riga) solo per domande con codice/immagini/pile
+      const t0=dequeue(qBase,baseKey(it))||(RICH_Q.test(it.q)?dequeue(qTail,tailKey(it)):null);
       if(t0){
         taken.add(t0.id);
         updates.push({id:t0.id,q:t0.q,patch:richPatch(t0,it,true)});
