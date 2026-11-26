@@ -2270,8 +2270,15 @@ function prepare(exam,items,defSrc){
   // Candidate: tutte le domande importate tranne quelle con pile [OSI:]/[TCPIP:] e quelle che un elemento
   // di questo import riconosce già col testo esatto (verranno aggiornate da quell'elemento, non rubate).
   const exactIn=new Set(items.map(it=>norm(it.q)));
+  // Terza coda, ultimo ripiego: solo opzioni + risposta. Usata soltanto se quella combinazione è UNICA
+  // sia nell'archivio dell'esame sia nel file importato: opzioni generiche ("Vero/Falso", "1/2/3/4")
+  // non abbinano mai domande diverse tra loro.
+  const qOpt=new Map(), optArc=new Map(), optIn=new Map();
+  importedOf(exam).forEach(q=>{const ok=optAns(q);optArc.set(ok,(optArc.get(ok)||0)+1);});
+  items.forEach(it=>{const ok=optAns(it);optIn.set(ok,(optIn.get(ok)||0)+1);});
+  const optUnique=ok=>optArc.get(ok)===1&&optIn.get(ok)===1;
   importedOf(exam).filter(q=>!/\[(OSI|TCPIP)\s*:/i.test(q.q)&&!exactIn.has(norm(q.q)))
-    .forEach(q=>{enqueue(qBase,baseKey(q),q);enqueue(qTail,tailKey(q),q);});
+    .forEach(q=>{enqueue(qBase,baseKey(q),q);enqueue(qTail,tailKey(q),q);if(optUnique(optAns(q)))enqueue(qOpt,optAns(q),q);});
   const dequeue=(m,key)=>{
     const a=m.get(key); if(!a)return null;
     while(a.length&&(taken.has(a[0].id)||touched.has(a[0].id)))a.shift();
@@ -2282,7 +2289,7 @@ function prepare(exam,items,defSrc){
     let k=norm(it.q);
     if(!existing.has(k)){
       // chiave base per tutti; chiave di coda (solo ultima riga) solo per domande con codice/immagini/pile
-      const t0=dequeue(qBase,baseKey(it))||(RICH_Q.test(it.q)?dequeue(qTail,tailKey(it)):null);
+      const t0=dequeue(qBase,baseKey(it))||(RICH_Q.test(it.q)?(dequeue(qTail,tailKey(it))||dequeue(qOpt,optAns(it))):null);
       if(t0){
         taken.add(t0.id);
         updates.push({id:t0.id,q:t0.q,patch:richPatch(t0,it,true)});
